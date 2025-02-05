@@ -77,6 +77,11 @@ int main() {
                             outStream << outputString << endl;
                         }
                         outStream << "</PRE>";
+
+                        if (!inStream.is_open() || !outStream.is_open()) {
+                            throw MyFileException();
+                        }
+
                         inStream.close();
                         outStream.close();
                         break;
