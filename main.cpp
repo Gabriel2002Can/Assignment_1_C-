@@ -2,13 +2,16 @@
 #include <fstream>
 #include <string>
 #include <exception>
+#include <regex>
+#include <filesystem>
 
 using namespace std;
+namespace fs = std::filesystem;
 
 struct MyFileException : public exception {
 
     const string what() {
-        return "Name of file invalid\n";
+        return "File Name/Path is invalid\n";
     }
 };
 
@@ -38,6 +41,12 @@ int main() {
     string fileInputName;
     string fileOutputName;
 
+    //The regex is a mix of two regex masks, such as, the file name validator https://regexpattern.com/valid-filename/, and the path validator https://learn.microsoft.com/en-us/answers/questions/862484/regex-to-validate-a-valid-windows-folder-directory
+    //I also added the validation for reserved words, such as CON PRN.
+    //Then I added the character number limitation manually based on the character limitation https://learn.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation?tabs=registry
+    //Was used for verification https://regex101.com/
+    regex regexMask(R"(^(?![a-zA-Z]:\\)(?!\\)(?!.*[<>:"|?*])(?!.*\.$)(?!.*\.\.$)(?!.*\b(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])\b)[^<>:"|?*]{1,255}(\\[^<>:"|?*]{1,255})*$)");
+
     try {
         do {
 
@@ -47,8 +56,9 @@ int main() {
             getline(cin, fileInputName);
             inStream.open(fileInputName);
 
-            //If input file is open do
-            if (inStream.is_open()) {
+            //https://stackoverflow.com/questions/12774207/fastest-way-to-check-if-a-file-exists-using-standard-c-c11-14-17-c
+
+            if (regex_match(fileInputName,regexMask) && fs::exists(fileInputName)) {
                 string line;
 
                 do {
@@ -59,47 +69,43 @@ int main() {
                     getline(cin, fileOutputName);
                     outStream.open(fileOutputName, ios::app);
 
-                    //If output file is open do
-                    if (outStream.is_open()) {
+                    //https://forkful.ai/en/cpp/files-and-io/checking-if-a-directory-exists/ reference
+                    fs::path outputPath(fileOutputName);
+                    fs::path parentDir = outputPath.parent_path();
 
-                        outStream << "<PRE>" << endl;
-
-                        //Until the file finishes do
-                        while (!inStream.eof()) {
-
-                            //Get line and add content of line to line variable
-                            getline(inStream, line);
-
-                            //Replace the necessary values and add them to outputString variable
-                            outputString = replace(line);
-
-                            //Write outputString value into output file
-                            outStream << outputString << endl;
-                        }
-                        outStream << "</PRE>";
+                    if (regex_match(fileOutputName, regexMask) && (parentDir.empty() || fs::exists(parentDir))) {
 
                         if (!inStream.is_open() || !outStream.is_open()) {
                             throw MyFileException();
                         }
+
+                        outStream << "<PRE>" << endl;
+
+                        while (!inStream.eof()) {
+
+                            getline(inStream, line);
+
+                            outputString = replace(line);
+
+                            outStream << outputString << endl;
+                        }
+                        outStream << "</PRE>";
 
                         inStream.close();
                         outStream.close();
                         break;
                     }
 
-                    //If output file doesn't open
                     cout << "Output file name invalid" << endl << "Please try again\n" << endl;
 
                 } while (true);
                 break;
             }
 
-            //If input file doesn't open
             cout << "Unable to open input file" << endl << "Please try again\n" << endl;
 
         } while (true);
 
-        //Making sure that the files are closed
         if (inStream.is_open()) {
             inStream.close();
         }
